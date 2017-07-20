@@ -966,6 +966,10 @@ public:
 
 	DLL_LINKAGE const CArtifact * toArtifact() const;
 
+	///json serialization helpers
+	static si32 decode(const std::string & identifier);
+	static std::string encode(const si32 index);
+
 	ID_LIKE_CLASS_COMMON(ArtifactID, EArtifactID)
 
 	EArtifactID num;
@@ -1014,6 +1018,10 @@ public:
 	ID_LIKE_CLASS_COMMON(CreatureID, ECreatureID)
 
 	ECreatureID num;
+
+	///json serialization helpers
+	static si32 decode(const std::string & identifier);
+	static std::string encode(const si32 index);
 };
 
 ID_LIKE_OPERATORS(CreatureID, CreatureID::ECreatureID)
@@ -1057,6 +1065,10 @@ public:
 	ID_LIKE_CLASS_COMMON(SpellID, ESpellID)
 
 	ESpellID num;
+
+	///json serialization helpers
+	static si32 decode(const std::string & identifier);
+	static std::string encode(const si32 index);
 };
 
 ID_LIKE_OPERATORS(SpellID, SpellID::ESpellID)

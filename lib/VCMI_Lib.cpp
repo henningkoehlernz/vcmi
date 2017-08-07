@@ -32,13 +32,13 @@
 
 LibClasses * VLC = nullptr;
 
-DLL_LINKAGE void preinitDLL(CConsoleHandler *Console)
+DLL_LINKAGE void preinitDLL(CConsoleHandler * Console, bool onlyEssential)
 {
 	console = Console;
 	VLC = new LibClasses();
 	try
 	{
-		VLC->loadFilesystem();
+		VLC->loadFilesystem(onlyEssential);
 	}
 	catch(...)
 	{
@@ -47,9 +47,9 @@ DLL_LINKAGE void preinitDLL(CConsoleHandler *Console)
 	}
 }
 
-DLL_LINKAGE void loadDLLClasses()
+DLL_LINKAGE void loadDLLClasses(bool onlyEssential)
 {
-	VLC->init();
+	VLC->init(onlyEssential);
 }
 
 const IBonusTypeHandler * LibClasses::getBth() const
@@ -57,7 +57,7 @@ const IBonusTypeHandler * LibClasses::getBth() const
 	return bth;
 }
 
-void LibClasses::loadFilesystem()
+void LibClasses::loadFilesystem(bool onlyEssential)
 {
 	CStopWatch totalTime;
 	CStopWatch loadTime;
@@ -71,7 +71,7 @@ void LibClasses::loadFilesystem()
 	modh = new CModHandler();
 	logGlobal->info("\tMod handler: %d ms", loadTime.getDiff());
 
-	modh->loadMods();
+	modh->loadMods(onlyEssential);
 	modh->loadModFilesystems();
 	logGlobal->info("\tMod filesystems: %d ms", loadTime.getDiff());
 
@@ -89,7 +89,7 @@ template <class Handler> void createHandler(Handler *&handler, const std::string
 	logHandlerLoaded(name, timer);
 }
 
-void LibClasses::init()
+void LibClasses::init(bool onlyEssential)
 {
 	CStopWatch pomtime, totalTime;
 
@@ -121,7 +121,7 @@ void LibClasses::init()
 
 	modh->load();
 
-	modh->afterLoad();
+	modh->afterLoad(onlyEssential);
 
 	//FIXME: make sure that everything is ok after game restart
 	//TODO: This should be done every time mod config changes

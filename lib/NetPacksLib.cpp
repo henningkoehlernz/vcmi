@@ -1242,12 +1242,12 @@ DLL_LINKAGE void BattleNextRound::applyGs(CGameState *gs)
 
 	for(CStack *s : gs->curB->stacks)
 	{
-		s->state -= EBattleStackState::DEFENDING;
-		s->state -= EBattleStackState::WAITING;
-		s->state -= EBattleStackState::MOVED;
-		s->state -= EBattleStackState::HAD_MORALE;
-		s->state -= EBattleStackState::FEAR;
-		s->state -= EBattleStackState::DRAINED_MANA;
+		s->stackState.defending = false;
+		s->stackState.waiting = false;
+		s->stackState.moved = false;
+		s->stackState.hadMorale = false;
+		s->stackState.fear = false;
+		s->stackState.drainedMana = false;
 		s->stackState.counterAttacks.reset();
 		// new turn effects
 		s->updateBonuses(Bonus::NTurns);
@@ -1274,8 +1274,8 @@ DLL_LINKAGE void BattleSetActiveStack::applyGs(CGameState *gs)
 	//remove bonuses that last until when stack gets new turn
 	st->popBonuses(Bonus::UntilGetsTurn);
 
-	if(vstd::contains(st->state,EBattleStackState::MOVED)) //if stack is moving second time this turn it must had a high morale bonus
-		st->state.insert(EBattleStackState::HAD_MORALE);
+	if(st->stackState.moved) //if stack is moving second time this turn it must had a high morale bonus
+		st->stackState.hadMorale = true;
 }
 
 DLL_LINKAGE void BattleTriggerEffect::applyGs(CGameState *gs)
@@ -1294,7 +1294,7 @@ DLL_LINKAGE void BattleTriggerEffect::applyGs(CGameState *gs)
 	case Bonus::MANA_DRAIN:
 	{
 		CGHeroInstance * h = gs->getHero(ObjectInstanceID(additionalInfo));
-		st->state.insert (EBattleStackState::DRAINED_MANA);
+		st->stackState.drainedMana = true;
 		h->mana -= val;
 		vstd::amax(h->mana, 0);
 		break;
@@ -1310,7 +1310,7 @@ DLL_LINKAGE void BattleTriggerEffect::applyGs(CGameState *gs)
 	case Bonus::ENCHANTER:
 		break;
 	case Bonus::FEAR:
-		st->state.insert(EBattleStackState::FEAR);
+		st->stackState.fear = true;
 		break;
 	default:
 		logNetwork->error("Unrecognized trigger effect type %d", effect);
@@ -1330,15 +1330,6 @@ DLL_LINKAGE void BattleUpdateGateState::applyGs(CGameState *gs)
 
 void BattleResult::applyGs(CGameState *gs)
 {
-	for (CStack *s : gs->curB->stacks)
-	{
-		if (s->base && s->base->armyObj && vstd::contains(s->state, EBattleStackState::SUMMONED))
-		{
-			//stack with SUMMONED flag but coming from garrison -> most likely resurrected, needs to be removed
-			assert(&s->base->armyObj->getStack(s->slot) == s->base);
-			const_cast<CArmedInstance*>(s->base->armyObj)->eraseStack(s->slot);
-		}
-	}
 	for (auto & elem : gs->curB->stacks)
 		delete elem;
 
@@ -1452,7 +1443,7 @@ DLL_LINKAGE void BattleStackAttacked::applyGs(CGameState *gs)
 	}
 
 	//killed summoned creature should be removed like clone
-	if(killed() && vstd::contains(at->state, EBattleStackState::SUMMONED))
+	if(killed() && at->stackState.summoned)
 		at->makeGhost();
 }
 
@@ -1502,24 +1493,22 @@ DLL_LINKAGE void StartAction::applyGs(CGameState *gs)
 	switch(ba.actionType)
 	{
 	case Battle::DEFEND:
-		st->state -= EBattleStackState::DEFENDING_ANIM;
-		st->state.insert(EBattleStackState::DEFENDING);
-		st->state.insert(EBattleStackState::DEFENDING_ANIM);
+		st->stackState.waiting = false;
+		st->stackState.defending = true;
+		st->stackState.defendingAnim = true;
 		break;
 	case Battle::WAIT:
-		st->state -= EBattleStackState::DEFENDING_ANIM;
-		st->state.insert(EBattleStackState::WAITING);
-		return;
+		st->stackState.defendingAnim = false;
+		st->stackState.waiting = true;
+		break;
 	case Battle::HERO_SPELL: //no change in current stack state
-		return;
+		break;
 	default: //any active stack action - attack, catapult, heal, spell...
-		st->state -= EBattleStackState::DEFENDING_ANIM;
-		st->state.insert(EBattleStackState::MOVED);
+		st->stackState.waiting = false;
+		st->stackState.defendingAnim = false;
+		st->stackState.moved = true;
 		break;
 	}
-
-	if(st)
-		st->state -= EBattleStackState::WAITING; //if stack was waiting it has made move, so it won't be "waiting" anymore (if the action was WAIT, then we have returned)
 }
 
 DLL_LINKAGE void BattleSpellCast::applyGs(CGameState *gs)
@@ -1545,16 +1534,6 @@ void actualizeEffect(CStack * s, const Bonus & ef)
 		}
 	}
 	CBonusSystemNode::treeHasChanged();
-}
-
-void actualizeEffect(CStack * s, const std::vector<Bonus> & ef)
-{
-	//actualizing features vector
-
-	for(const Bonus &fromEffect : ef)
-	{
-		actualizeEffect(s, fromEffect);
-	}
 }
 
 DLL_LINKAGE void SetStackEffect::applyGs(CGameState *gs)
@@ -1755,8 +1734,8 @@ DLL_LINKAGE void BattleStacksRemoved::applyGs(CGameState *gs)
 			{
 				CStack * toRemove = gs->curB->stacks[b];
 				toRemove->stackState.health.reset();
-				toRemove->state.erase(EBattleStackState::GHOST_PENDING);
-				toRemove->state.insert(EBattleStackState::GHOST);
+				toRemove->stackState.ghostPending = false;
+				toRemove->stackState.ghost = true;
 				toRemove->detachFromAll();//TODO: may be some bonuses should remain
 
 				//stack may be removed instantly (not being killed first)
@@ -1793,8 +1772,7 @@ DLL_LINKAGE void BattleStackAdded::applyGs(CGameState *gs)
 
 	CStackBasicDescriptor csbd(creID, amount);
 	CStack * addedStack = gs->curB->generateNewStack(csbd, side, SlotID::SUMMONED_SLOT_PLACEHOLDER, pos); //TODO: netpacks?
-	if(summoned)
-		addedStack->state.insert(EBattleStackState::SUMMONED);
+	addedStack->stackState.summoned = summoned;
 
 	addedStack->localInit(gs->curB.get());
 	gs->curB->stacks.push_back(addedStack);
@@ -1832,7 +1810,7 @@ DLL_LINKAGE void BattleSetStackProperty::applyGs(CGameState * gs)
 		}
 		case CLONED:
 		{
-			stack->state.insert(EBattleStackState::CLONED);
+			stack->stackState.cloned = true;
 			break;
 		}
 		case HAS_CLONE:

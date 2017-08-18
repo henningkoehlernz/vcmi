@@ -164,6 +164,18 @@ public:
 class DLL_LINKAGE CStackState : public IStackState
 {
 public:
+	bool cloned;
+	bool defending;
+	bool defendingAnim;
+	bool drainedMana;
+	bool fear;
+	bool hadMorale;
+	bool ghost;
+	bool ghostPending;
+	bool moved;
+	bool summoned;
+	bool waiting;
+
 	CCasts casts;
 	CRetaliations counterAttacks;
 	CHealth health;
@@ -237,7 +249,6 @@ public:
 
 	///id of alive clone of this stack clone if any
 	si32 cloneID;
-	std::set<EBattleStackState::EBattleStackState> state;
 
 	CStack(const CStackInstance * base, PlayerColor O, int I, ui8 Side, SlotID S);
 	CStack(const CStackBasicDescriptor * stack, PlayerColor O, int I, ui8 Side, SlotID S = SlotID(255));
@@ -250,12 +261,11 @@ public:
 
 	void localInit(BattleInfo * battleInfo);
 	std::string getName() const; //plural or singular
-	bool willMove(int turn = 0) const; //if stack has remaining move this turn
-
-	bool moved(int turn = 0) const; //if stack was already moved this turn
-	bool waited(int turn = 0) const;
 
 	bool canMove(int turn = 0) const; //if stack can move
+	bool moved(int turn = 0) const; //if stack was already moved this turn
+	bool willMove(int turn = 0) const; //if stack has remaining move this turn
+	bool waited(int turn = 0) const;
 
 	bool canBeHealed() const; //for first aid tent - only harmed stacks that are not war machines
 
@@ -364,7 +374,6 @@ public:
 		h & slot;
 		h & side;
 		h & position;
-		h & state;
 
 		const CArmedInstance * army = (base ? base->armyObj : nullptr);
 		SlotID extSlot = (base ? base->armyObj->findStack(base) : SlotID());

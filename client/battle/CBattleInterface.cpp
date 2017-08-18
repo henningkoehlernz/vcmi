@@ -2182,7 +2182,7 @@ void CBattleInterface::handleHex(BattleHex myNumber, int eventType)
 				{
 					if (!(shere->hasBonusOfType(Bonus::UNDEAD)
 						|| shere->hasBonusOfType(Bonus::NON_LIVING)
-						|| vstd::contains(shere->state, EBattleStackState::SUMMONED)
+						|| shere->stackState.summoned
 						|| shere->isClone()
 						|| shere->hasBonusOfType(Bonus::SIEGE_WEAPON)
 						))

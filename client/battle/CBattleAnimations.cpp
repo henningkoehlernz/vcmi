@@ -231,22 +231,20 @@ std::string CDefenceAnimation::getMySound()
 {
 	if(killed)
 		return battle_sound(stack->getCreature(), killed);
-
-	if (vstd::contains(stack->state, EBattleStackState::DEFENDING_ANIM))
+	else if(stack->stackState.defendingAnim)
 		return battle_sound(stack->getCreature(), defend);
-
-	return battle_sound(stack->getCreature(), wince);
+	else
+		return battle_sound(stack->getCreature(), wince);
 }
 
 CCreatureAnim::EAnimType CDefenceAnimation::getMyAnimType()
 {
 	if(killed)
 		return CCreatureAnim::DEATH;
-
-	if (vstd::contains(stack->state, EBattleStackState::DEFENDING_ANIM))
+	else if(stack->stackState.defendingAnim)
 		return CCreatureAnim::DEFENCE;
-
-	return CCreatureAnim::HITTED;
+	else
+		return CCreatureAnim::HITTED;
 }
 
 void CDefenceAnimation::startAnimation()

@@ -357,6 +357,17 @@ void CHealth::serializeJson(JsonSerializeFormat & handler)
 ///CStackState
 CStackState::CStackState(const IUnitInfo * Owner)
 	: owner(Owner),
+	cloned(false),
+	defending(false),
+	defendingAnim(false),
+	drainedMana(false),
+	fear(false),
+	hadMorale(false),
+	ghost(false),
+	ghostPending(false),
+	moved(false),
+	summoned(false),
+	waiting(false),
 	casts(Owner),
 	counterAttacks(Owner),
 	health(Owner),
@@ -367,6 +378,17 @@ CStackState::CStackState(const IUnitInfo * Owner)
 
 CStackState::CStackState(const CStackState & other)
 	: owner(other.owner),
+	cloned(other.cloned),
+	defending(other.defending),
+	defendingAnim(other.defendingAnim),
+	drainedMana(other.drainedMana),
+	fear(other.fear),
+	hadMorale(other.hadMorale),
+	ghost(other.ghost),
+	ghostPending(other.ghostPending),
+	moved(other.moved),
+	summoned(other.summoned),
+	waiting(other.waiting),
 	casts(other.casts),
 	counterAttacks(other.counterAttacks),
 	health(other.health),
@@ -378,6 +400,17 @@ CStackState::CStackState(const CStackState & other)
 CStackState & CStackState::operator=(const CStackState & other)
 {
 	//do not change owner
+	cloned = other.cloned;
+	defending = other.defending;
+	defendingAnim = other.defendingAnim;
+	drainedMana = other.drainedMana;
+	fear = other.fear;
+	hadMorale = other.hadMorale;
+	ghost = other.ghost;
+	ghostPending = other.ghostPending;
+	moved = other.moved;
+	summoned = other.summoned;
+	waiting = other.waiting;
 	casts = other.casts;
 	counterAttacks = other.counterAttacks;
 	health = other.health;
@@ -445,6 +478,19 @@ void CStackState::serializeJson(JsonSerializeFormat & handler)
 {
 	if(!handler.saving)
 		reset();
+
+	handler.serializeBool("cloned", cloned);
+	handler.serializeBool("defending", defending);
+	handler.serializeBool("defendingAnim", defendingAnim);
+	handler.serializeBool("drainedMana", drainedMana);
+	handler.serializeBool("fear", fear);
+	handler.serializeBool("hadMorale", hadMorale);
+	handler.serializeBool("ghost", ghost);
+	handler.serializeBool("ghostPending", ghostPending);
+	handler.serializeBool("moved", moved);
+	handler.serializeBool("summoned", summoned);
+	handler.serializeBool("waiting", waiting);
+
 	handler.serializeStruct("casts", casts);
 	handler.serializeStruct("counterAttacks", counterAttacks);
 	handler.serializeStruct("health", health);
@@ -459,6 +505,18 @@ void CStackState::localInit()
 
 void CStackState::reset()
 {
+	cloned = false;
+	defending = false;
+	defendingAnim = false;
+	drainedMana = false;
+	fear = false;
+	hadMorale = false;
+	ghost = false;
+	ghostPending = false;
+	moved = false;
+	summoned = false;
+	waiting = false;
+
 	casts.reset();
 	counterAttacks.reset();
 	health.reset();
@@ -467,6 +525,18 @@ void CStackState::reset()
 
 void CStackState::swap(CStackState & other)
 {
+	std::swap(cloned, other.cloned);
+	std::swap(defending, other.defending);
+	std::swap(defendingAnim, other.defendingAnim);
+	std::swap(drainedMana, other.drainedMana);
+	std::swap(fear, other.fear);
+	std::swap(hadMorale, other.hadMorale);
+	std::swap(ghost, other.ghost);
+	std::swap(ghostPending, other.ghostPending);
+	std::swap(moved, other.moved);
+	std::swap(summoned, other.summoned);
+	std::swap(waiting, other.waiting);
+
 	std::swap(owner, other.owner);
 	std::swap(casts, other.casts);
 	std::swap(counterAttacks, other.counterAttacks);
@@ -614,7 +684,7 @@ si32 CStack::magicResistance() const
 
 bool CStack::willMove(int turn) const
 {
-	return (turn ? true : !vstd::contains(state, EBattleStackState::DEFENDING))
+	return (turn ? true : !stackState.defending)
 		   && !moved(turn)
 		   && canMove(turn);
 }
@@ -629,7 +699,7 @@ bool CStack::canMove(int turn) const
 bool CStack::moved(int turn) const
 {
 	if(!turn)
-		return vstd::contains(state, EBattleStackState::MOVED);
+		return stackState.moved;
 	else
 		return false;
 }
@@ -637,7 +707,7 @@ bool CStack::moved(int turn) const
 bool CStack::waited(int turn) const
 {
 	if(!turn)
-		return vstd::contains(state, EBattleStackState::WAITING);
+		return stackState.waiting;
 	else
 		return false;
 }
@@ -827,7 +897,7 @@ CHealth CStack::healthAfterHealed(int32_t & toHeal, EHealLevel level, EHealPower
 	CHealth res = stackState.health;
 
 	if(level == EHealLevel::HEAL && power == EHealPower::ONE_BATTLE)
-		logGlobal->error("Heal for one battle does not make sense", nodeName(), toHeal);
+		logGlobal->error("Heal for one battle does not make sense: %s for %d HP", nodeName(), toHeal);
 	else if(isClone())
 		logGlobal->error("Attempt to heal clone: %s for %d HP", nodeName(), toHeal);
 	else
@@ -926,12 +996,12 @@ bool CStack::isDead() const
 
 bool CStack::isClone() const
 {
-	return vstd::contains(state, EBattleStackState::CLONED);
+	return stackState.cloned;
 }
 
 bool CStack::isGhost() const
 {
-	return vstd::contains(state, EBattleStackState::GHOST);
+	return stackState.ghost;
 }
 
 bool CStack::isTurret() const
@@ -949,7 +1019,7 @@ bool CStack::canBeHealed() const
 void CStack::makeGhost()
 {
 	stackState.health.reset();
-	state.insert(EBattleStackState::GHOST_PENDING);
+	stackState.ghostPending = true;
 }
 
 ui8 CStack::getSpellSchoolLevel(const spells::Mode mode, const CSpell * spell, int * outSelectedSchool) const

@@ -4625,15 +4625,15 @@ void CGameHandler::stackTurnTrigger(const CStack *st)
 				}
 			}
 		}
-		if (st->hasBonusOfType(Bonus::MANA_DRAIN) && !vstd::contains(st->state, EBattleStackState::DRAINED_MANA))
+		if(st->hasBonusOfType(Bonus::MANA_DRAIN) && !st->stackState.drainedMana)
 		{
 			const PlayerColor opponent = gs->curB->theOtherPlayer(gs->curB->battleGetOwner(st));
 			const CGHeroInstance * opponentHero = gs->curB->getHero(opponent);
-			if (opponentHero)
+			if(opponentHero)
 			{
 				ui32 manaDrained = st->valOfBonuses(Bonus::MANA_DRAIN);
 				vstd::amin(manaDrained, opponentHero->mana);
-				if (manaDrained)
+				if(manaDrained)
 				{
 					bte.effect = Bonus::MANA_DRAIN;
 					bte.val = manaDrained;
@@ -5807,21 +5807,17 @@ void CGameHandler::runBattle()
 		//stack loop
 
 		const CStack *next;
-		while (!battleResult.get() && (next = curB.getNextStack()) && next->willMove())
+		while(!battleResult.get() && (next = curB.getNextStack()) && next->willMove())
 		{
-			std::set <const CStack *> stacksToRemove;
-			for (auto stack : curB.stacks)
+			BattleStacksRemoved bsr;
+			for(auto stack : curB.stacks)
 			{
-				if (vstd::contains(stack->state, EBattleStackState::GHOST_PENDING))
-					stacksToRemove.insert(stack);
+				if(stack->stackState.ghostPending)
+					bsr.stackIDs.insert(stack->ID);
 			}
 
-			for (auto stack : stacksToRemove)
-			{
-				BattleStacksRemoved bsr;
-				bsr.stackIDs.insert(stack->ID);
+			if(!bsr.stackIDs.empty())
 				sendAndApply(&bsr);
-			}
 
 			//check for bad morale => freeze
 			int nextStackMorale = next->MoraleVal();
@@ -5954,7 +5950,7 @@ void CGameHandler::runBattle()
 				{
 					stackTurnTrigger(next); //various effects
 
-					if (vstd::contains(next->state, EBattleStackState::FEAR))
+					if(next->stackState.fear)
 					{
 						makeStackDoNothing(next); //end immediately if stack was affected by fear
 					}
@@ -5996,21 +5992,21 @@ void CGameHandler::runBattle()
 				//we're after action, all results applied
 				checkBattleStateChanges(); //check if this action ended the battle
 
-				if (next != nullptr)
+				if(next != nullptr)
 				{
 					//check for good morale
 					nextStackMorale = next->MoraleVal();
-					if (!vstd::contains(next->state,EBattleStackState::HAD_MORALE)  //only one extra move per turn possible
-						&& !vstd::contains(next->state,EBattleStackState::DEFENDING)
+					if(!next->stackState.hadMorale  //only one extra move per turn possible
+						&& !next->stackState.defending
 						&& !next->waited()
-						&& !vstd::contains(next->state, EBattleStackState::FEAR)
+						&& !next->stackState.fear
 						&&  next->alive()
 						&&  nextStackMorale > 0
 						&& !(NBonus::hasOfType(gs->curB->battleGetFightingHero(0), Bonus::BLOCK_MORALE)
 							|| NBonus::hasOfType(gs->curB->battleGetFightingHero(1), Bonus::BLOCK_MORALE)) //checking if gs->curB->heroes have (or don't have) morale blocking bonuses
 						)
 					{
-						if (getRandomGenerator().nextInt(23) < nextStackMorale) //this stack hasn't got morale this turn
+						if(getRandomGenerator().nextInt(23) < nextStackMorale) //this stack hasn't got morale this turn
 						{
 							BattleTriggerEffect bte;
 							bte.stackID = next->ID;
@@ -6409,7 +6405,7 @@ CasualtiesAfterBattle::CasualtiesAfterBattle(const CArmedInstance * _army, Battl
 
 	for(CStack * st : bat->stacks)
 	{
-		if(vstd::contains(st->state, EBattleStackState::SUMMONED)) //don't take into account temporary summoned stacks
+		if(st->stackState.summoned) //don't take into account temporary summoned stacks
 			continue;
 		if(st->owner != color) //remove only our stacks
 			continue;

@@ -329,7 +329,7 @@ void CBattleInfoCallback::battleGetStackQueue(std::vector<const CStack *> &out, 
 		int p = -1; //in which phase this stack will move?
 		if(turn <= 0 && s->waited()) //consider waiting state only for ongoing round
 		{
-			if(vstd::contains(s->state, EBattleStackState::HAD_MORALE))
+			if(s->stackState.hadMorale)
 				p = 2;
 			else
 				p = 3;
